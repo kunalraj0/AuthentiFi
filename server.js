@@ -463,6 +463,26 @@ app.get('/createRetailer', (req, res) => {
     res.sendFile('views/createRetailer.html', { root: __dirname });
 });
 
+// Serve the sign-up form
+app.get('/signUpForm', (req, res) => {
+    res.sendFile('views/signUp.html', { root: __dirname });
+});
+
+// Serve the login form
+app.get('/loginForm', (req, res) => {
+    res.sendFile('views/login.html', { root: __dirname });
+});
+
+// Serve the retailer login form
+app.get('/retailerLoginForm', (req, res) => {
+    res.sendFile('views/retailerLogin.html', { root: __dirname });
+});
+
+// Serve the customer details form
+app.get('/getCustomerDetailsForm', (req, res) => {
+    res.sendFile('views/getCustomerDetails.html', { root: __dirname });
+});
+
 // Main website which has 2 routers - manufacturer & retailer
 app.get('/', (req, res) => {
     res.sendFile('views/index.html', { root: __dirname });
