@@ -5,7 +5,7 @@ const session = require('express-session');
 const bcrypt = require('bcrypt');
 const bodyParser = require('body-parser');
 const crypto = require('crypto');
-const Web3 = require('web3');
+const Web3 = require('web3'); // No need to destructure Web3
 const BigNumber = require('bignumber.js');
 const fs = require('fs');
 // const io = require('socket.io')(app);
@@ -39,9 +39,10 @@ app.use(bodyParser.urlencoded({
 
 // MySQL Connection
 const connection = mysql.createConnection({
-    host: IP,
-    user: process.env.database_user,
-    password: process.env.database_password,
+    host: 'localhost',
+    port: 3306, // Replace with your MySQL port if different
+    user: 'root',
+    password: 'root',
     database: 'authentifi'
 });
 
@@ -54,8 +55,21 @@ connection.connect(function(err) {
 });
 
 // Web3 connection
-const web3 = new Web3(new Web3.providers.HttpProvider('http://localhost:7545'));
-console.log(`Talking with a geth server ${web3.version.api} \n`);
+const web3 = new Web3();
+web3.setProvider(new web3.providers.HttpProvider("http://127.0.0.1:7545"));
+
+if (!web3.isConnected()) {
+    console.error('Unable to connect to Ethereum node at http://127.0.0.1:7545');
+} else {
+    console.log('Connected to Ethereum node at http://127.0.0.1:7545');
+    const accounts = web3.eth.accounts;
+    if (accounts.length === 0) {
+        console.error('No accounts found in the Ethereum node. Please ensure Ganache is running.');
+        process.exit(1); // Exit the application if no accounts are found
+    }
+    web3.eth.defaultAccount = accounts[0]; // Set the first account as the default account
+    console.log(`Default account set to ${web3.eth.defaultAccount}`);
+}
 
 const abiArray = [
 	{
@@ -415,12 +429,10 @@ const abiArray = [
 	}
 ];
 
-const address = '';
+const address = '0x74025b013741921022775d6876cA165722d62199';
 
-const contract = web3.eth.contract(abiArray);
-
-const contractInstance = contract.at(address);
-web3.eth.defaultAccount = web3.eth.coinbase;
+// For web3 0.20.6
+const contract = web3.eth.contract(abiArray).at(address);
 
 // This function generates a QR code
 function generateQRCode() {
@@ -465,42 +477,38 @@ app.get('/', (req, res) => {
  */
 app.post('/signUp', (req, res) => {
     console.log('Request to /signUp\n');
-    let name = req.body.name;
-    let email = req.body.email;
-    let password = req.body.password;
-    let phone = req.body.phone;
-    let hashedPassword = hashBcrypt(password);
-    console.log(`Email: ${email} \n`);
-    // Adding the user in MySQL
+    const { name, email, password, phone } = req.body;
+    const hashedPassword = hashBcrypt(password);
+    const hashedEmail = hashMD5(email);
+
     connection.query('SELECT * FROM USER WHERE Email = ? LIMIT 1', [email], (error, results) => {
         if (error) {
-            callback(error);
-            return res.status(400);
+            console.error('MySQL error:', error);
+            return res.status(400).send('Database error');
         }
         if (results.length) {
             return res.status(400).send('Email already exists!');
         }
-        connection.query('INSERT INTO USER VALUES (?,?,?,?)', [name, email, hashedPassword, phone], (error, results) => {
+        connection.query('INSERT INTO USER VALUES (?,?,?,?)', [name, email, hashedPassword, phone], (error) => {
             if (error) {
-                callback(error);
-                return res.status(400);
+                console.error('MySQL error:', error);
+                return res.status(400).send('Database error');
             }
-            res.status(200).send('Signup successful!');
-            // Adding user to the Blockchain
-            hashedEmail = hashMD5(email);
-            let ok = createCustomer(hashedEmail, name, phone);
-            if (ok) {
-                console.log(`User ${hashedEmail} successfully added to Blockchain!\n`);
-            } else {
-                console.log('ERROR! User could not be added to Blockchain.\n');
-            }
+            createCustomer(hashedEmail, name, phone, (err, result) => {
+                if (err) {
+                    console.error('Blockchain error:', err);
+                    return res.status(400).send('Blockchain error');
+                }
+                console.log(`User ${hashedEmail} successfully added to Blockchain!`);
+                res.status(200).send('Signup successful!');
+            });
         });
     });
 });
 
 // Add the user in Blockchain
-function createCustomer(hashedEmail, name, phone) {
-    return contractInstance.createCustomer(hashedEmail, name, phone, { from: web3.eth.accounts[0], gas: 3000000 });
+function createCustomer(hashedEmail, name, phone, callback) {
+    contract.createCustomer(hashedEmail, name, phone, { from: web3.eth.defaultAccount, gas: 3000000 }, callback);
 }
 
 
@@ -571,21 +579,22 @@ app.post('/retailerSignup', (req, res) => {
                 return res.status(400).send('Some SQL Error');
             }
             // Adding retailer to Blockchain
-            let ok = createRetailer(retailerHashedEmail, retailerName, retailerLocation);
-            if (ok) {
+            createRetailer(retailerHashedEmail, retailerName, retailerLocation, (err, result) => {
+                if (err) {
+                    console.error('Blockchain error:', err);
+                    return res.status(400).send('Blockchain error');
+                }
                 console.log(`Retailer ${retailerHashedEmail} successfully added to Blockchain!\n`);
                 return res.status(200).send('Retailer successfully added');
-            }
-            console.log('ERROR! Retailer could not be added to Blockchain.\n');
-            return res.status(400).send('Adding Retailer Unsuccessful');
+            });
         });
     });
 });
 
+
 // Add retailer to Blockchain
-function createRetailer(retailerHashedEmail, retailerName, retailerLocation) {
-    return contractInstance.createRetailer(retailerHashedEmail, retailerName, retailerLocation,
-                                        { from: web3.eth.accounts[0], gas: 3000000 });
+function createRetailer(retailerHashedEmail, retailerName, retailerLocation, callback) {
+    contract.createRetailer(retailerHashedEmail, retailerName, retailerLocation, { from: web3.eth.defaultAccount, gas: 3000000 }, callback);
 }
 
 
@@ -646,12 +655,14 @@ app.post('/addRetailerToCode', (req, res) => {
     let retailerEmail = req.body.email;
     let hashedEmail = hashMD5(retailerEmail);
     console.log(`retailerEmail: ${retailerEmail}, hashed email: ${hashedEmail} \n`);
-    let ok = contractInstance.addRetailerToCode(code, hashedEmail);
-    if(!ok) {
-        return res.status(400).send('Error');
-    }
-    console.log(`Successfully added ${hashedEmail} to code ${code} \n`);
-    return res.status(200).send('Success');
+    contract.addRetailerToCode(code, hashedEmail, { from: web3.eth.defaultAccount, gas: 3000000 }, (err, result) => {
+        if (err) {
+            console.error('Blockchain error:', err);
+            return res.status(400).send('Error');
+        }
+        console.log(`Successfully added ${hashedEmail} to code ${code} \n`);
+        return res.status(200).send('Success');
+    });
 });
 
 
@@ -667,22 +678,39 @@ app.post('/myAssets', (req, res) => {
     let myAssetsArray = [];
     let email = req.body.email;
     let hashedEmail = hashMD5(email);
-    let arrayOfCodes = contractInstance.getCodes(hashedEmail);
-    console.log(`Email ${email}`);
-    console.log(`Customer has these product codes: ${arrayOfCodes} \n`);
-    for (code in arrayOfCodes) {
-        let ownedCodeDetails = contractInstance.getOwnedCodeDetails(arrayOfCodes[code]);
-        let notOwnedCodeDetails = contractInstance.getNotOwnedCodeDetails(arrayOfCodes[code]);
-        myAssetsArray.push({
-            'code': arrayOfCodes[code], 'brand': notOwnedCodeDetails[0],
-            'model': notOwnedCodeDetails[1], 'description': notOwnedCodeDetails[2],
-            'status': notOwnedCodeDetails[3], 'manufacturerName': notOwnedCodeDetails[4],
-            'manufacturerLocation': notOwnedCodeDetails[5], 'manufacturerTimestamp': notOwnedCodeDetails[6],
-            'retailerName': ownedCodeDetails[0], 'retailerLocation': ownedCodeDetails[1],
-            'retailerTimestamp': ownedCodeDetails[2]
+    contract.getCodes(hashedEmail, (err, arrayOfCodes) => {
+        if (err) {
+            console.error('Blockchain error:', err);
+            return res.status(400).send('Error');
+        }
+        console.log(`Email ${email}`);
+        console.log(`Customer has these product codes: ${arrayOfCodes} \n`);
+        arrayOfCodes.forEach((code) => {
+            contract.getOwnedCodeDetails(code, (err, ownedCodeDetails) => {
+                if (err) {
+                    console.error('Blockchain error:', err);
+                    return res.status(400).send('Error');
+                }
+                contract.getNotOwnedCodeDetails(code, (err, notOwnedCodeDetails) => {
+                    if (err) {
+                        console.error('Blockchain error:', err);
+                        return res.status(400).send('Error');
+                    }
+                    myAssetsArray.push({
+                        'code': code, 'brand': notOwnedCodeDetails[0],
+                        'model': notOwnedCodeDetails[1], 'description': notOwnedCodeDetails[2],
+                        'status': notOwnedCodeDetails[3], 'manufacturerName': notOwnedCodeDetails[4],
+                        'manufacturerLocation': notOwnedCodeDetails[5], 'manufacturerTimestamp': notOwnedCodeDetails[6],
+                        'retailerName': ownedCodeDetails[0], 'retailerLocation': ownedCodeDetails[1],
+                        'retailerTimestamp': ownedCodeDetails[2]
+                    });
+                    if (myAssetsArray.length === arrayOfCodes.length) {
+                        res.status(200).send(JSON.parse(JSON.stringify(myAssetsArray)));
+                    }
+                });
+            });
         });
-    }
-    res.status(200).send(JSON.parse(JSON.stringify(myAssetsArray)));
+    });
 });
 
 
@@ -698,13 +726,15 @@ app.post('/stolen', (req, res) => {
     let email = req.body.email;
     let hashedEmail = hashMD5(email);
     console.log(`Email: ${email} \n`);
-    let ok = contractInstance.reportStolen(code, hashedEmail);
-    if (!ok) {
-        console.log(`ERROR! Code: ${code} status could not be changed.\n`);
-        return res.status(400).send('ERROR! Product status could not be changed.');
-    }
-    console.log(`Product code ${code} successfully changed!\n`);
-    res.status(200).send('Product status successfully changed!');
+    contract.reportStolen(code, hashedEmail, { from: web3.eth.defaultAccount, gas: 3000000 }, (err, result) => {
+        if (err) {
+            console.error('Blockchain error:', err);
+            console.log(`ERROR! Code: ${code} status could not be changed.\n`);
+            return res.status(400).send('ERROR! Product status could not be changed.');
+        }
+        console.log(`Product code ${code} successfully changed!\n`);
+        res.status(200).send('Product status successfully changed!');
+    });
 });
 
 
@@ -782,20 +812,27 @@ app.post('/getProductDetails', (req, res) => {
             let timeElapsed = Math.floor((currentTime - QRCodes[i]['currentTime']) / 1000);
             // QR Codes are valid only for 600 secs
             if (timeElapsed <= 600) {
-                let ownedCodeDetails = contractInstance.getOwnedCodeDetails(code);
-                let notOwnedCodeDetails = contractInstance.getNotOwnedCodeDetails(code);
-                if (!ownedCodeDetails || !notOwnedCodeDetails) {
-                    return res.status(400).send('Could not retrieve product details.');
-                }
-                let productDetails = {
-                    'brand': notOwnedCodeDetails[0], 'model': notOwnedCodeDetails[1], 'description': notOwnedCodeDetails[2],
-                    'status': notOwnedCodeDetails[3], 'manufacturerName': notOwnedCodeDetails[4],
-                    'manufacturerLocation': notOwnedCodeDetails[5], 'manufacturerTimestamp': notOwnedCodeDetails[6],
-                    'retailerName': ownedCodeDetails[0], 'retailerLocation': ownedCodeDetails[1],
-                    'retailerTimestamp': ownedCodeDetails[2]
-                };
-                console.log('QRCode matched\n');
-                return res.status(200).send(JSON.parse(JSON.stringify(productDetails)));
+                contract.getOwnedCodeDetails(code, (err, ownedCodeDetails) => {
+                    if (err) {
+                        console.error('Blockchain error:', err);
+                        return res.status(400).send('Could not retrieve product details.');
+                    }
+                    contract.getNotOwnedCodeDetails(code, (err, notOwnedCodeDetails) => {
+                        if (err) {
+                            console.error('Blockchain error:', err);
+                            return res.status(400).send('Could not retrieve product details.');
+                        }
+                        let productDetails = {
+                            'brand': notOwnedCodeDetails[0], 'model': notOwnedCodeDetails[1], 'description': notOwnedCodeDetails[2],
+                            'status': notOwnedCodeDetails[3], 'manufacturerName': notOwnedCodeDetails[4],
+                            'manufacturerLocation': notOwnedCodeDetails[5], 'manufacturerTimestamp': notOwnedCodeDetails[6],
+                            'retailerName': ownedCodeDetails[0], 'retailerLocation': ownedCodeDetails[1],
+                            'retailerTimestamp': ownedCodeDetails[2]
+                        };
+                        console.log('QRCode matched\n');
+                        return res.status(200).send(JSON.parse(JSON.stringify(productDetails)));
+                    });
+                });
             }
             console.log('Time out error\n');
             return res.status(400).send('Timed out!');
@@ -856,45 +893,49 @@ app.post('/buyerConfirm', (req, res) => {
             let timeElapsed = Math.floor((currentTime - QRCodes[i]['currentTime']) / 1000);
             // QR Codes are valid only for 600 secs
             if (timeElapsed <= 600) {
-                if(QRCodes[i]['confirm'] === '1'){
+                if (QRCodes[i]['confirm'] === '1') { // Check if buyer has confirmed
                     let hashedSellerEmail = hashMD5(QRCodes[i]['sellerEmail']);
                     let hashedBuyerEmail = hashMD5(QRCodes[i]['buyerEmail']);
                     let code = QRCodes[i]['code'];
-                    var ok;
-                    if(QRCodes[i]['retailer'] === '1'){
+                    if (QRCodes[i]['retailer'] === '1') {
                         console.log('Performing transaction for retailer\n');
-                        ok = contractInstance.initialOwner(code, hashedSellerEmail, hashedBuyerEmail,
-                                                        { from: web3.eth.accounts[0], gas: 3000000 });
+                        contract.initialOwner(code, hashedSellerEmail, hashedBuyerEmail, { from: web3.eth.defaultAccount, gas: 3000000 }, (err, result) => {
+                            if (err) {
+                                console.error('Blockchain error:', err);
+                                return res.status(400).send('Error');
+                            }
+                            console.log('Success in buyerConfirm, transaction is done!\n');
+                            return res.status(200).send('Ok');
+                        });
                     } else {
                         console.log('Performing transaction for customer\n');
-                        ok = contractInstance.changeOwner(code, hashedSellerEmail, hashedBuyerEmail,
-                                                        { from: web3.eth.accounts[0], gas: 3000000 });
+                        contract.changeOwner(code, hashedSellerEmail, hashedBuyerEmail, { from: web3.eth.defaultAccount, gas: 3000000 }, (err, result) => {
+                            if (err) {
+                                console.error('Blockchain error:', err);
+                                return res.status(400).send('Error');
+                            }
+                            console.log('Success in buyerConfirm, transaction is done!\n');
+                            return res.status(200).send('Ok');
+                        });
                     }
-                    if (!ok) {
-                        return res.status(400).send('Error');
-                    }
-                    console.log('Success in buyerConfirm, transaction is done!\n');
-                    return res.status(200).send('Ok');
                 }
                 console.log('Buyer has not confirmed\n');
             }
             return res.status(400).send('Timed out!');
         }
     }
-    console.log('Product not found\n')
+    console.log('Product not found\n');
     return res.status(400).send('Product not found');
 });
 
 // Function that creates an initial owner for a product
-function initialOwner(code, retailerHashedEmail, customerHashedEmail) {
-    return contractInstance.initialOwner(code, retailerHashedEmail, customerHashedEmail,
-                                        { from: web3.eth.accounts[0], gas: 3000000 });
+function initialOwner(code, retailerHashedEmail, customerHashedEmail, callback) {
+    contract.initialOwner(code, retailerHashedEmail, customerHashedEmail, { from: web3.eth.defaultAccount, gas: 3000000 }, callback);
 }
 
 // Function that creates transfers ownership of a product
-function changeOwner(code, oldOwnerHashedEmail, newOwnerHashedEmail) {
-    return contractInstance.changeOwner(code, oldOwnerHashedEmail, newOwnerHashedEmail,
-                                        { from: web3.eth.accounts[0], gas: 3000000 });
+function changeOwner(code, oldOwnerHashedEmail, newOwnerHashedEmail, callback) {
+    contract.changeOwner(code, oldOwnerHashedEmail, newOwnerHashedEmail, { from: web3.eth.defaultAccount, gas: 3000000 }, callback);
 }
 
 
@@ -907,14 +948,19 @@ function changeOwner(code, oldOwnerHashedEmail, newOwnerHashedEmail) {
 app.post('/scan', (req, res) => {
     console.log('Request made to /scan\n');
     let code = req.body.code;
-    let productDetails = contractInstance.getNotOwnedCodeDetails(code);
-    let productDetailsObj = {
-        'name': productDetails[0], 'model': productDetails[1], 'status': productDetails[2],
-        'description': productDetails[3], 'manufacturerName': productDetails[4],
-        'manufacturerLocation': productDetails[5], 'manufacturerTimestamp': productDetails[6]
-    };
-    console.log(`Code ${code} \n`);
-    res.status(200).send(JSON.stringify(productDetailsObj));
+    contract.getNotOwnedCodeDetails(code, (err, productDetails) => {
+        if (err) {
+            console.error('Blockchain error:', err);
+            return res.status(400).send('Error');
+        }
+        let productDetailsObj = {
+            'name': productDetails[0], 'model': productDetails[1], 'status': productDetails[2],
+            'description': productDetails[3], 'manufacturerName': productDetails[4],
+            'manufacturerLocation': productDetails[5], 'manufacturerTimestamp': productDetails[6]
+        };
+        console.log(`Code ${code} \n`);
+        res.status(200).send(JSON.stringify(productDetailsObj));
+    });
 });
 
 
@@ -936,21 +982,22 @@ app.post('/QRCodeForManufacturer', (req, res) => {
     manufacturerTimestamp = manufacturerTimestamp.toISOString().slice(0, 10);
     let salt = crypto.randomBytes(20).toString('hex');
     let code = hashMD5(brand + model + status + description + manufacturerName + manufacturerLocation + salt);
-    let ok = contractInstance.createCode(code, brand, model, status, description, manufacturerName, manufacturerLocation,
-                                        manufacturerTimestamp, { from: web3.eth.accounts[0], gas: 3000000 });
-    console.log(`Brand: ${brand} \n`);
-    if (!ok) {
-        return res.status(400).send('ERROR! QR Code for manufacturer could not be generated.');
-    }
-    console.log(`The QR Code generated is: ${code} \n`);
-    let QRcode = code + '\n' + brand + '\n' + model + '\n' + description + '\n' + manufacturerName + '\n' + manufacturerLocation;
-    fs.writeFile('views/davidshimjs-qrcodejs-04f46c6/code.txt', QRcode, (err, QRcode) => {
+    contract.createCode(code, brand, model, status, description, manufacturerName, manufacturerLocation, manufacturerTimestamp, { from: web3.eth.defaultAccount, gas: 3000000 }, (err, result) => {
         if (err) {
-            console.log(err);
+            console.error('Blockchain error:', err);
+            return res.status(400).send('ERROR! QR Code for manufacturer could not be generated.');
         }
-        console.log('Successfully written QR code to file!\n');
+        console.log(`Brand: ${brand} \n`);
+        console.log(`The QR Code generated is: ${code} \n`);
+        let QRcode = code + '\n' + brand + '\n' + model + '\n' + description + '\n' + manufacturerName + '\n' + manufacturerLocation;
+        fs.writeFile('views/davidshimjs-qrcodejs-04f46c6/code.txt', QRcode, (err, QRcode) => {
+            if (err) {
+                console.log(err);
+            }
+            console.log('Successfully written QR code to file!\n');
+        });
+        res.sendFile('views/davidshimjs-qrcodejs-04f46c6/index.html', { root: __dirname });
     });
-    res.sendFile('views/davidshimjs-qrcodejs-04f46c6/index.html', { root: __dirname });
 });
 
 
@@ -964,12 +1011,17 @@ app.get('/getCustomerDetails', (req, res) => {
     console.log('Request to /getCustomerDetails\n');
     let email = req.body.email;
     let hashedEmail = hash(email);
-    let customerDetails = contractInstance.getCustomerDetails(hashedEmail);
-    console.log(`Email: ${email} \n`);
-    let customerDetailsObj = {
-        'name': customerDetails[0], 'phone': customerDetails[1]
-    };
-    res.status(200).send(JSON.parse(JSON.stringify(customerDetailsObj)));
+    contract.getCustomerDetails(hashedEmail, (err, customerDetails) => {
+        if (err) {
+            console.error('Blockchain error:', err);
+            return res.status(400).send('Error');
+        }
+        console.log(`Email: ${email} \n`);
+        let customerDetailsObj = {
+            'name': customerDetails[0], 'phone': customerDetails[1]
+        };
+        res.status(200).send(JSON.parse(JSON.stringify(customerDetailsObj)));
+    });
 });
 
 // Server start

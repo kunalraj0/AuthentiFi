@@ -28,15 +28,20 @@
   },
   "homepage": "https://github.com/kylelobo/AuthentiFi#readme",
   "dependencies": {
-    "bcrypt": "^3.0.3",
+    "bcrypt": "^5.0.1",
+    "bignumber.js": "^9.2.1",
     "crypto": "^1.0.1",
     "debug": "^4.1.1",
+<<<<<<< Updated upstream
+=======
+    "dotenv": "^16.5.0",
+>>>>>>> Stashed changes
     "express": "^4.16.4",
     "express-session": "^1.15.6",
-    "mysql": "^2.16.0",
-    "passport": "^0.4.0",
-    "redis": "^2.8.0",
-    "socket.io": "^2.2.0",
+    "mysql": "^2.18.1",
+    "passport": "^0.7.0",
+    "redis": "^4.7.0",
+    "socket.io": "^4.8.1",
     "web3": "^0.20.6"
   }
 }
