@@ -575,27 +575,24 @@ function createCustomer(hashedEmail, name, phone, callback) {
  */
 app.post('/login', (req, res) => {
     console.log('Request to /login\n');
-    let email = req.body.email;
-    let password = req.body.password;
+    const email = req.body.email;
+    const password = req.body.password;
     console.log(`Email: ${email} \n`);
+
     connection.query('SELECT * FROM USER WHERE Email = ? LIMIT 1', [email], (error, results) => {
         if (error) {
-            callback(error);
-            return res.status(400);
+            console.error('MySQL error:', error);
+            return res.status(400).send('Database error');
         }
         if (results.length) {
-            connection.query('SELECT Password FROM USER WHERE Email = (?)', [email], (error, results) => {
-                if (error) {
-                    callback(error);
-                    return res.status(400);
-                }
-                let pass = results[0].Password;
-                if (bcrypt.compareSync(password, pass)) {
-                    console.log(`Login successful with ${email} \n`);
-                    return res.status(200).send('Login successful!');
-                }
-                return res.status(400).send('Login failed.');
-            });
+            const hashedPassword = results[0].Password;
+            if (bcrypt.compareSync(password, hashedPassword)) {
+                console.log(`Login successful with ${email} \n`);
+                return res.status(200).send('Login successful!');
+            } else {
+                console.log('Incorrect password\n');
+                return res.status(400).send('Login failed. Incorrect password.');
+            }
         }
         console.log('Email does not exist!\n');
         return res.status(400).send('Email does not exist!');
