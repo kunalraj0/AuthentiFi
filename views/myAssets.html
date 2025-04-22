@@ -9,11 +9,42 @@
 <body>
     <div class="container">
         <h1>My Assets</h1>
-        <form id="myAssetsForm">
-            <label for="email">Email</label>
-            <input type="email" id="email" name="email" required>
-
-            <button type="submit">Get My Assets</button>
+        <form name="myform" action="http://localhost:8080/QRCodeForManufacturer" method="POST">
+            <div class="form-group row">
+                <label for="brand" class="col-md-4 col-form-label text-md-right">Brand Name</label>
+                <div class="col-md-6">
+                    <input type="text" id="brand" class="form-control" name="brand">
+                </div>
+            </div>
+            <div class="form-group row">
+                <label for="model" class="col-md-4 col-form-label text-md-right">Model</label>
+                <div class="col-md-6">
+                    <input type="text" id="model" class="form-control" name="model">
+                </div>
+            </div>
+            <div class="form-group row">
+                <label for="description" class="col-md-4 col-form-label text-md-right">Description</label>
+                <div class="col-md-6">
+                    <input type="text" id="description" class="form-control" name="description">
+                </div>
+            </div>
+            <div class="form-group row">
+                <label for="manufacturerName" class="col-md-4 col-form-label text-md-right">Manufacturer Name</label>
+                <div class="col-md-6">
+                    <input type="text" id="manufacturerName" class="form-control" name="manufacturerName">
+                </div>
+            </div>
+            <div class="form-group row">
+                <label for="manufacturerLocation" class="col-md-4 col-form-label text-md-right">Manufacturer Location</label>
+                <div class="col-md-6">
+                    <input type="text" id="manufacturerLocation" class="form-control" name="manufacturerLocation">
+                </div>
+            </div>
+            <div class="form-group row">
+                <div class="col-md-6 offset-md-4">
+                    <button type="submit" class="btn btn-primary">Submit</button>
+                </div>
+            </div>
         </form>
 
         <div id="assetsList"></div>
