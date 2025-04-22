@@ -483,6 +483,41 @@ app.get('/getCustomerDetailsForm', (req, res) => {
     res.sendFile('views/getCustomerDetails.html', { root: __dirname });
 });
 
+// Serve the retailer details page
+app.get('/retailerDetailsForm', (req, res) => {
+    res.sendFile('views/retailerDetails.html', { root: __dirname });
+});
+
+// Serve the add retailer to code form
+app.get('/addRetailerToCodeForm', (req, res) => {
+    res.sendFile('views/addRetailerToCode.html', { root: __dirname });
+});
+
+// Serve the my assets form
+app.get('/myAssetsForm', (req, res) => {
+    res.sendFile('views/myAssets.html', { root: __dirname });
+});
+
+// Serve the get product details form
+app.get('/getProductDetailsForm', (req, res) => {
+    res.sendFile('views/getProductDetails.html', { root: __dirname });
+});
+
+// Serve the seller confirm form
+app.get('/sellerConfirmForm', (req, res) => {
+    res.sendFile('views/sellerConfirm.html', { root: __dirname });
+});
+
+// Serve the buyer confirm form
+app.get('/buyerConfirmForm', (req, res) => {
+    res.sendFile('views/buyerConfirm.html', { root: __dirname });
+});
+
+// Serve the scan form
+app.get('/scanForm', (req, res) => {
+    res.sendFile('views/scan.html', { root: __dirname });
+});
+
 // Main website which has 2 routers - manufacturer & retailer
 app.get('/', (req, res) => {
     res.sendFile('views/index.html', { root: __dirname });
