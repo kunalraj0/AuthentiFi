@@ -32,10 +32,7 @@
     "bignumber.js": "^9.2.1",
     "crypto": "^1.0.1",
     "debug": "^4.1.1",
-<<<<<<< Updated upstream
-=======
     "dotenv": "^16.5.0",
->>>>>>> Stashed changes
     "express": "^4.16.4",
     "express-session": "^1.15.6",
     "mysql": "^2.18.1",
