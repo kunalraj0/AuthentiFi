@@ -5,10 +5,9 @@ const session = require('express-session');
 const bcrypt = require('bcrypt');
 const bodyParser = require('body-parser');
 const crypto = require('crypto');
-const Web3 = require('web3'); // No need to destructure Web3
+const Web3 = require('web3');
 const BigNumber = require('bignumber.js');
 const fs = require('fs');
-// const io = require('socket.io')(app);
 
 // Secret ID for session
 const secret_id = process.env.secret;
@@ -55,384 +54,12 @@ connection.connect(function(err) {
 });
 
 // Web3 connection
-const web3 = new Web3();
-web3.setProvider(new web3.providers.HttpProvider("http://127.0.0.1:7545"));
+const web3 = new Web3(new Web3.providers.HttpProvider("http://127.0.0.1:7545"));
 
-if (!web3.isConnected()) {
-    console.error('Unable to connect to Ethereum node at http://127.0.0.1:7545');
-} else {
-    console.log('Connected to Ethereum node at http://127.0.0.1:7545');
-    const accounts = web3.eth.accounts;
-    if (accounts.length === 0) {
-        console.error('No accounts found in the Ethereum node. Please ensure Ganache is running.');
-        process.exit(1); // Exit the application if no accounts are found
-    }
-    web3.eth.defaultAccount = accounts[0]; // Set the first account as the default account
-    console.log(`Default account set to ${web3.eth.defaultAccount}`);
-}
-
-const abiArray = [
-	{
-		"constant": false,
-		"inputs": [
-			{
-				"name": "_code",
-				"type": "string"
-			},
-			{
-				"name": "_hashedEmailRetailer",
-				"type": "string"
-			}
-		],
-		"name": "addRetailerToCode",
-		"outputs": [
-			{
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"payable": true,
-		"stateMutability": "payable",
-		"type": "function"
-	},
-	{
-		"constant": false,
-		"inputs": [
-			{
-				"name": "_code",
-				"type": "string"
-			},
-			{
-				"name": "_oldCustomer",
-				"type": "string"
-			},
-			{
-				"name": "_newCustomer",
-				"type": "string"
-			}
-		],
-		"name": "changeOwner",
-		"outputs": [
-			{
-				"name": "",
-				"type": "bool"
-			}
-		],
-		"payable": true,
-		"stateMutability": "payable",
-		"type": "function"
-	},
-	{
-		"constant": false,
-		"inputs": [
-			{
-				"name": "_code",
-				"type": "string"
-			},
-			{
-				"name": "_brand",
-				"type": "string"
-			},
-			{
-				"name": "_model",
-				"type": "string"
-			},
-			{
-				"name": "_status",
-				"type": "uint256"
-			},
-			{
-				"name": "_description",
-				"type": "string"
-			},
-			{
-				"name": "_manufactuerName",
-				"type": "string"
-			},
-			{
-				"name": "_manufactuerLocation",
-				"type": "string"
-			},
-			{
-				"name": "_manufactuerTimestamp",
-				"type": "string"
-			}
-		],
-		"name": "createCode",
-		"outputs": [
-			{
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"payable": true,
-		"stateMutability": "payable",
-		"type": "function"
-	},
-	{
-		"constant": false,
-		"inputs": [
-			{
-				"name": "_hashedEmail",
-				"type": "string"
-			},
-			{
-				"name": "_name",
-				"type": "string"
-			},
-			{
-				"name": "_phone",
-				"type": "string"
-			}
-		],
-		"name": "createCustomer",
-		"outputs": [
-			{
-				"name": "",
-				"type": "bool"
-			}
-		],
-		"payable": true,
-		"stateMutability": "payable",
-		"type": "function"
-	},
-	{
-		"constant": false,
-		"inputs": [],
-		"name": "createOwner",
-		"outputs": [],
-		"payable": false,
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"constant": false,
-		"inputs": [
-			{
-				"name": "_hashedEmail",
-				"type": "string"
-			},
-			{
-				"name": "_retailerName",
-				"type": "string"
-			},
-			{
-				"name": "_retailerLocation",
-				"type": "string"
-			}
-		],
-		"name": "createRetailer",
-		"outputs": [
-			{
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"payable": true,
-		"stateMutability": "payable",
-		"type": "function"
-	},
-	{
-		"constant": false,
-		"inputs": [
-			{
-				"name": "_code",
-				"type": "string"
-			},
-			{
-				"name": "_retailer",
-				"type": "string"
-			},
-			{
-				"name": "_customer",
-				"type": "string"
-			}
-		],
-		"name": "initialOwner",
-		"outputs": [
-			{
-				"name": "",
-				"type": "bool"
-			}
-		],
-		"payable": true,
-		"stateMutability": "payable",
-		"type": "function"
-	},
-	{
-		"constant": false,
-		"inputs": [
-			{
-				"name": "_code",
-				"type": "string"
-			},
-			{
-				"name": "_customer",
-				"type": "string"
-			}
-		],
-		"name": "reportStolen",
-		"outputs": [
-			{
-				"name": "",
-				"type": "bool"
-			}
-		],
-		"payable": true,
-		"stateMutability": "payable",
-		"type": "function"
-	},
-	{
-		"constant": true,
-		"inputs": [
-			{
-				"name": "_customer",
-				"type": "string"
-			}
-		],
-		"name": "getCodes",
-		"outputs": [
-			{
-				"name": "",
-				"type": "string[]"
-			}
-		],
-		"payable": false,
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"constant": true,
-		"inputs": [
-			{
-				"name": "_code",
-				"type": "string"
-			}
-		],
-		"name": "getCustomerDetails",
-		"outputs": [
-			{
-				"name": "",
-				"type": "string"
-			},
-			{
-				"name": "",
-				"type": "string"
-			}
-		],
-		"payable": false,
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"constant": true,
-		"inputs": [
-			{
-				"name": "_code",
-				"type": "string"
-			}
-		],
-		"name": "getNotOwnedCodeDetails",
-		"outputs": [
-			{
-				"name": "",
-				"type": "string"
-			},
-			{
-				"name": "",
-				"type": "string"
-			},
-			{
-				"name": "",
-				"type": "uint256"
-			},
-			{
-				"name": "",
-				"type": "string"
-			},
-			{
-				"name": "",
-				"type": "string"
-			},
-			{
-				"name": "",
-				"type": "string"
-			},
-			{
-				"name": "",
-				"type": "string"
-			}
-		],
-		"payable": false,
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"constant": true,
-		"inputs": [
-			{
-				"name": "_code",
-				"type": "string"
-			}
-		],
-		"name": "getOwnedCodeDetails",
-		"outputs": [
-			{
-				"name": "",
-				"type": "string"
-			},
-			{
-				"name": "",
-				"type": "string"
-			}
-		],
-		"payable": false,
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"constant": true,
-		"inputs": [
-			{
-				"name": "_code",
-				"type": "string"
-			}
-		],
-		"name": "getretailerDetails",
-		"outputs": [
-			{
-				"name": "",
-				"type": "string"
-			},
-			{
-				"name": "",
-				"type": "string"
-			}
-		],
-		"payable": false,
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"constant": true,
-		"inputs": [],
-		"name": "whoIsOwner",
-		"outputs": [
-			{
-				"name": "",
-				"type": "address"
-			}
-		],
-		"payable": false,
-		"stateMutability": "view",
-		"type": "function"
-	}
-];
-
-const address = '0x74025b013741921022775d6876cA165722d62199';
-
-// For web3 0.20.6
-const contract = web3.eth.contract(abiArray).at(address);
+// ABI and Contract Address
+const abiArray = JSON.parse(fs.readFileSync('./contracts/authentifi_abi.json', 'utf8')); // Save ABI as a JSON file
+const contractAddress = "YOUR_DEPLOYED_CONTRACT_ADDRESS"; // Replace with the deployed contract address
+const contract = web3.eth.contract(abiArray).at(contractAddress);
 
 // This function generates a QR code
 function generateQRCode() {
@@ -615,23 +242,21 @@ app.post('/retailerSignup', (req, res) => {
     let retailerHashedPassword = hashBcrypt(retailerPassword);
     let retailerHashedEmail = hashMD5(retailerEmail);
     console.log(`retailerEmail: ${retailerEmail}, hashedEmail: ${retailerHashedEmail} \n`);
-    // Adding the retailer in MySQL
+
     connection.query('SELECT * FROM RETAILER WHERE retailerEmail = ? LIMIT 1', [retailerEmail], (error, results) => {
         if (error) {
-            callback(error);
+            console.error('MySQL error:', error);
             return res.status(400).send('Some SQL Error');
         }
         if (results.length) {
             return res.status(400).send('Email already exists!');
         }
-        connection.query('INSERT INTO RETAILER VALUES (?,?,?,?)', [retailerName, retailerEmail, retailerLocation,
-                                                                    retailerHashedPassword], (error, results) => {
+        connection.query('INSERT INTO RETAILER VALUES (?,?,?,?)', [retailerName, retailerEmail, retailerLocation, retailerHashedPassword], (error) => {
             if (error) {
-                callback(error);
+                console.error('MySQL error:', error);
                 return res.status(400).send('Some SQL Error');
             }
-            // Adding retailer to Blockchain
-            createRetailer(retailerHashedEmail, retailerName, retailerLocation, (err, result) => {
+            createRetailer(retailerHashedEmail, retailerName, retailerLocation, (err) => {
                 if (err) {
                     console.error('Blockchain error:', err);
                     return res.status(400).send('Blockchain error');
@@ -661,19 +286,22 @@ app.post('/retailerLogin', (req, res) => {
     let retailerEmail = req.body.email;
     let retailerPassword = req.body.password;
     console.log(`Email: ${retailerEmail} \n`);
+
     connection.query('SELECT retailerHashedPassword FROM RETAILER WHERE retailerEmail = ?', [retailerEmail], (error, results) => {
         if (error) {
-            callback(error);
-            return res.status(400);
+            console.error('MySQL error:', error);
+            return res.status(400).send('Database error');
         }
-        let pass = results[0].retailerHashedPassword ;
-        if (bcrypt.compareSync(retailerPassword, pass)){
-            console.log(`${retailerEmail} has successfully logged in\n`);
-            return res.status(200).send('Retailer login successful!');
+        if (results.length) {
+            let pass = results[0].retailerHashedPassword;
+            if (bcrypt.compareSync(retailerPassword, pass)) {
+                console.log(`${retailerEmail} has successfully logged in\n`);
+                return res.status(200).send('Retailer login successful!');
+            }
         }
         console.log(`${retailerEmail} COULD NOT login\n`);
         return res.status(400).send('Retailer login failed.');
-    })
+    });
 });
 
 
@@ -938,20 +566,20 @@ app.post('/buyerConfirm', (req, res) => {
     console.log('Request made to /buyerConfirm\n');
     let buyerEmail = req.body.email;
     let QRCode = req.body.QRCode;
-    let currentTime = Date.now();         // Date.now() gets the current time in milliseconds
+    let currentTime = Date.now();
     console.log(`Email: ${buyerEmail} and QRCode: ${QRCode} \n`);
+
     for (let i = 0; i < QRCodes.length; i++) {
         if (QRCode === QRCodes[i]['QRCode']) {
             let timeElapsed = Math.floor((currentTime - QRCodes[i]['currentTime']) / 1000);
-            // QR Codes are valid only for 600 secs
             if (timeElapsed <= 600) {
-                if (QRCodes[i]['confirm'] === '1') { // Check if buyer has confirmed
+                if (QRCodes[i]['confirm'] === '1') {
                     let hashedSellerEmail = hashMD5(QRCodes[i]['sellerEmail']);
                     let hashedBuyerEmail = hashMD5(QRCodes[i]['buyerEmail']);
                     let code = QRCodes[i]['code'];
                     if (QRCodes[i]['retailer'] === '1') {
                         console.log('Performing transaction for retailer\n');
-                        contract.initialOwner(code, hashedSellerEmail, hashedBuyerEmail, { from: web3.eth.defaultAccount, gas: 3000000 }, (err, result) => {
+                        contract.initialOwner(code, hashedSellerEmail, hashedBuyerEmail, { from: web3.eth.defaultAccount, gas: 3000000 }, (err) => {
                             if (err) {
                                 console.error('Blockchain error:', err);
                                 return res.status(400).send('Error');
@@ -961,7 +589,7 @@ app.post('/buyerConfirm', (req, res) => {
                         });
                     } else {
                         console.log('Performing transaction for customer\n');
-                        contract.changeOwner(code, hashedSellerEmail, hashedBuyerEmail, { from: web3.eth.defaultAccount, gas: 3000000 }, (err, result) => {
+                        contract.changeOwner(code, hashedSellerEmail, hashedBuyerEmail, { from: web3.eth.defaultAccount, gas: 3000000 }, (err) => {
                             if (err) {
                                 console.error('Blockchain error:', err);
                                 return res.status(400).send('Error');
@@ -970,9 +598,12 @@ app.post('/buyerConfirm', (req, res) => {
                             return res.status(200).send('Ok');
                         });
                     }
+                    return; // Exit loop after processing
                 }
                 console.log('Buyer has not confirmed\n');
+                return res.status(400).send('Buyer has not confirmed.');
             }
+            console.log('Timed out!\n');
             return res.status(400).send('Timed out!');
         }
     }
@@ -999,19 +630,43 @@ function changeOwner(code, oldOwnerHashedEmail, newOwnerHashedEmail, callback) {
  */
 app.post('/scan', (req, res) => {
     console.log('Request made to /scan\n');
-    let code = req.body.code;
+    const code = req.body.code;
+
+    if (!code) {
+        console.error('Invalid code provided');
+        return res.status(400).send('Invalid code provided');
+    }
+
+    console.log(`Fetching details for code: ${code}`);
+
     contract.getNotOwnedCodeDetails(code, (err, productDetails) => {
         if (err) {
             console.error('Blockchain error:', err);
-            return res.status(400).send('Error');
+            return res.status(400).send('Error retrieving product details from the blockchain.');
         }
-        let productDetailsObj = {
-            'name': productDetails[0], 'model': productDetails[1], 'status': productDetails[2],
-            'description': productDetails[3], 'manufacturerName': productDetails[4],
-            'manufacturerLocation': productDetails[5], 'manufacturerTimestamp': productDetails[6]
-        };
-        console.log(`Code ${code} \n`);
-        res.status(200).send(JSON.stringify(productDetailsObj));
+
+        if (!productDetails || productDetails.length === 0 || productDetails[0] === '') {
+            console.error('Invalid or empty product details returned from the blockchain');
+            return res.status(400).send('Product details not found or invalid.');
+        }
+
+        try {
+            const productDetailsObj = {
+                name: productDetails[0],
+                model: productDetails[1],
+                status: parseInt(productDetails[2], 10),
+                description: productDetails[3],
+                manufacturerName: productDetails[4],
+                manufacturerLocation: productDetails[5],
+                manufacturerTimestamp: productDetails[6],
+            };
+
+            console.log(`Code ${code} details retrieved successfully\n`);
+            res.status(200).send(productDetailsObj);
+        } catch (parseError) {
+            console.error('Error parsing product details:', parseError);
+            res.status(500).send('Error processing product details.');
+        }
     });
 });
 
@@ -1030,25 +685,26 @@ app.post('/QRCodeForManufacturer', (req, res) => {
     let description = req.body.description;
     let manufacturerName = req.body.manufacturerName;
     let manufacturerLocation = req.body.manufacturerLocation;
-    let manufacturerTimestamp = new Date();         // Date() gives current timestamp
-    manufacturerTimestamp = manufacturerTimestamp.toISOString().slice(0, 10);
+    let manufacturerTimestamp = new Date().toISOString().slice(0, 10);
     let salt = crypto.randomBytes(20).toString('hex');
     let code = hashMD5(brand + model + status + description + manufacturerName + manufacturerLocation + salt);
-    contract.createCode(code, brand, model, status, description, manufacturerName, manufacturerLocation, manufacturerTimestamp, { from: web3.eth.defaultAccount, gas: 3000000 }, (err, result) => {
+
+    contract.createCode(code, brand, model, status, description, manufacturerName, manufacturerLocation, manufacturerTimestamp, { from: web3.eth.defaultAccount, gas: 3000000 }, (err) => {
         if (err) {
             console.error('Blockchain error:', err);
             return res.status(400).send('ERROR! QR Code for manufacturer could not be generated.');
         }
         console.log(`Brand: ${brand} \n`);
         console.log(`The QR Code generated is: ${code} \n`);
-        let QRcode = code + '\n' + brand + '\n' + model + '\n' + description + '\n' + manufacturerName + '\n' + manufacturerLocation;
-        fs.writeFile('views/davidshimjs-qrcodejs-04f46c6/code.txt', QRcode, (err, QRcode) => {
+        let QRcode = `${code}\n${brand}\n${model}\n${description}\n${manufacturerName}\n${manufacturerLocation}`;
+        fs.writeFile('views/davidshimjs-qrcodejs-04f46c6/code.txt', QRcode, (err) => {
             if (err) {
-                console.log(err);
+                console.error('File write error:', err);
+                return res.status(500).send('Error writing QR code to file.');
             }
             console.log('Successfully written QR code to file!\n');
+            res.sendFile('views/davidshimjs-qrcodejs-04f46c6/index.html', { root: __dirname });
         });
-        res.sendFile('views/davidshimjs-qrcodejs-04f46c6/index.html', { root: __dirname });
     });
 });
 
@@ -1062,21 +718,40 @@ app.post('/QRCodeForManufacturer', (req, res) => {
 app.get('/getCustomerDetails', (req, res) => {
     console.log('Request to /getCustomerDetails\n');
     let email = req.body.email;
-    let hashedEmail = hash(email);
+    let hashedEmail = hashMD5(email);
+
     contract.getCustomerDetails(hashedEmail, (err, customerDetails) => {
         if (err) {
             console.error('Blockchain error:', err);
-            return res.status(400).send('Error');
+            return res.status(400).send('Error retrieving customer details.');
         }
-        console.log(`Email: ${email} \n`);
+        if (!customerDetails || customerDetails.length < 2) {
+            console.error('Invalid customer details returned from blockchain');
+            return res.status(400).send('Customer details not found.');
+        }
         let customerDetailsObj = {
-            'name': customerDetails[0], 'phone': customerDetails[1]
+            name: customerDetails[0],
+            phone: customerDetails[1]
         };
-        res.status(200).send(JSON.parse(JSON.stringify(customerDetailsObj)));
+        res.status(200).send(customerDetailsObj);
+    });
+});
+
+// New route to get not owned code details
+app.get('/getNotOwnedCodeDetails/:code', (req, res) => {
+    const code = req.params.code;
+
+    contract.getNotOwnedCodeDetails(code, (err, result) => {
+        if (err) {
+            console.error('Blockchain error:', err);
+            return res.status(400).send('Error retrieving code details.');
+        }
+        console.log('Code details:', result);
+        res.status(200).send(result);
     });
 });
 
 // Server start
-app.listen(port, (req, res) => {
+app.listen(port, () => {
     console.log(`Listening to port ${port}...\n`);
 });
